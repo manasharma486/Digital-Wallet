@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Wallet - Dashboard</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/dashboard.html" class="navbar-brand">Digital Wallet</a>
+        <div class="nav-links">
+            <a href="/dashboard.html" class="active">Dashboard</a>
+            <a href="/transfer.html">Transfer Money</a>
+            <a href="/transactions.html">Transactions</a>
+            <button onclick="clearAuth()" class="btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div id="alertBox" class="alert"></div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">Wallet Balance</div>
+                <div class="balance-amount" id="balanceDisplay">₹0.00</div>
+                <div style="margin-top: 0.5rem;">
+                    Status: <span id="statusBadge" class="badge">ACTIVE</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Quick Wallet Operations</div>
+                <form id="depositForm" style="margin-bottom: 1rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="number" id="depositAmount" step="0.01" min="1" placeholder="Amount (e.g. 1000)" required>
+                        <button type="submit" class="btn" style="width: 140px;">Deposit</button>
+                    </div>
+                </form>
+                <form id="withdrawForm">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="number" id="withdrawAmount" step="0.01" min="1" placeholder="Amount (e.g. 500)" required>
+                        <button type="submit" class="btn btn-secondary" style="width: 140px;">Withdraw</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3>Recent Transactions</h3>
+                <a href="/transactions.html" style="color: var(--primary-color); text-decoration: none;">View All</a>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="recentTxnBody">
+                    <tr><td colspan="5" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        checkAuth();
+
+        function showAlert(msg, isSuccess = true) {
+            const box = document.getElementById('alertBox');
+            box.className = isSuccess ? 'alert alert-success' : 'alert alert-error';
+            box.textContent = msg;
+            box.style.display = 'block';
+            setTimeout(() => box.style.display = 'none', 4000);
+        }
+
+        async function loadWallet() {
+            try {
+                const res = await apiRequest('/wallet/me');
+                const w = res.data;
+                document.getElementById('balanceDisplay').textContent = `${w.currency === 'INR' ? '₹' : '$'}${parseFloat(w.balance).toFixed(2)}`;
+                
+                const badge = document.getElementById('statusBadge');
+                badge.textContent = w.status;
+                badge.className = `badge badge-${w.status.toLowerCase()}`;
+            } catch (err) {
+                showAlert(err.message, false);
+            }
+        }
+
+        async function loadRecentTxns() {
+            try {
+                const res = await apiRequest('/transactions?page=0&size=5');
+                const tbody = document.getElementById('recentTxnBody');
+                tbody.innerHTML = '';
+                
+                if (!res.data.content || res.data.content.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No transactions found.</td></tr>';
+                    return;
+                }
+
+                res.data.content.forEach(t => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><code>${t.reference}</code></td>
+                        <td>${t.type}</td>
+                        <td>₹${parseFloat(t.amount).toFixed(2)}</td>
+                        <td><span class="badge badge-active">${t.status}</span></td>
+                        <td>${new Date(t.createdAt).toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        document.getElementById('depositForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amt = document.getElementById('depositAmount').value;
+            try {
+                await apiRequest('/wallet/deposit', {
+                    method: 'POST',
+                    headers: { 'Idempotency-Key': generateIdempotencyKey() },
+                    body: { amount: parseFloat(amt) }
+                });
+                showAlert(`Successfully deposited ₹${amt}`);
+                document.getElementById('depositAmount').value = '';
+                loadWallet();
+                loadRecentTxns();
+            } catch (err) {
+                showAlert(err.message, false);
+            }
+        });
+
+        document.getElementById('withdrawForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amt = document.getElementById('withdrawAmount').value;
+            try {
+                await apiRequest('/wallet/withdraw', {
+                    method: 'POST',
+                    headers: { 'Idempotency-Key': generateIdempotencyKey() },
+                    body: { amount: parseFloat(amt) }
+                });
+                showAlert(`Successfully withdrew ₹${amt}`);
+                document.getElementById('withdrawAmount').value = '';
+                loadWallet();
+                loadRecentTxns();
+            } catch (err) {
+                showAlert(err.message, false);
+            }
+        });
+
+        loadWallet();
+        loadRecentTxns();
+    </script>
+</body>
+</html>

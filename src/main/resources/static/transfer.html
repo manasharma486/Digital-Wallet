@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Wallet - Transfer Money</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/dashboard.html" class="navbar-brand">Digital Wallet</a>
+        <div class="nav-links">
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/transfer.html" class="active">Transfer Money</a>
+            <a href="/transactions.html">Transactions</a>
+            <button onclick="clearAuth()" class="btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card" style="max-width: 600px; margin: 2rem auto;">
+            <h2>Transfer Money</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Instantly send money to any registered wallet user.</p>
+
+            <div id="alertBox" class="alert"></div>
+
+            <form id="transferForm">
+                <div class="form-group">
+                    <label>Receiver Email Address</label>
+                    <input type="email" id="receiverEmail" required placeholder="receiver@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Amount (₹)</label>
+                    <input type="number" id="amount" step="0.01" min="0.01" required placeholder="500.00">
+                </div>
+                <div class="form-group">
+                    <label>Description / Note</label>
+                    <input type="text" id="description" placeholder="Dinner split / Rent share">
+                </div>
+                <div class="form-group">
+                    <label>Idempotency Key (Auto-generated)</label>
+                    <input type="text" id="idempotencyKey" readonly style="background-color: #f1f5f9; font-family: monospace;">
+                </div>
+                <button type="submit" class="btn">Send Money Now</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        checkAuth();
+
+        function initIdempotencyKey() {
+            document.getElementById('idempotencyKey').value = generateIdempotencyKey();
+        }
+
+        function showAlert(msg, isSuccess = true) {
+            const box = document.getElementById('alertBox');
+            box.className = isSuccess ? 'alert alert-success' : 'alert alert-error';
+            box.textContent = msg;
+            box.style.display = 'block';
+        }
+
+        document.getElementById('transferForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const key = document.getElementById('idempotencyKey').value;
+            const email = document.getElementById('receiverEmail').value;
+            const amt = parseFloat(document.getElementById('amount').value);
+            const desc = document.getElementById('description').value;
+
+            try {
+                const res = await apiRequest('/transactions/transfer', {
+                    method: 'POST',
+                    headers: { 'Idempotency-Key': key },
+                    body: {
+                        receiverEmail: email,
+                        amount: amt,
+                        description: desc
+                    }
+                });
+
+                showAlert(`Transfer successful! Reference: ${res.data.transactionId || res.data.reference}`);
+                initIdempotencyKey();
+                document.getElementById('amount').value = '';
+                document.getElementById('description').value = '';
+            } catch (err) {
+                showAlert(err.message, false);
+            }
+        });
+
+        initIdempotencyKey();
+    </script>
+</body>
+</html>

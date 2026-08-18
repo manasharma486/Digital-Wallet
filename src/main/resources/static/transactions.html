@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Wallet - Transactions</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/dashboard.html" class="navbar-brand">Digital Wallet</a>
+        <div class="nav-links">
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/transfer.html">Transfer Money</a>
+            <a href="/transactions.html" class="active">Transactions</a>
+            <button onclick="clearAuth()" class="btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>Transaction History</h2>
+            <div style="display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap;">
+                <div>
+                    <label>Type</label>
+                    <select id="filterType" style="width: 150px;">
+                        <option value="">All Types</option>
+                        <option value="DEPOSIT">DEPOSIT</option>
+                        <option value="WITHDRAWAL">WITHDRAWAL</option>
+                        <option value="TRANSFER">TRANSFER</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Status</label>
+                    <select id="filterStatus" style="width: 150px;">
+                        <option value="">All Statuses</option>
+                        <option value="SUCCESS">SUCCESS</option>
+                        <option value="PENDING">PENDING</option>
+                        <option value="FAILED">FAILED</option>
+                    </select>
+                </div>
+                <div style="align-self: flex-end;">
+                    <button id="btnFilter" class="btn" style="width: 120px;">Filter</button>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Type</th>
+                        <th>Sender</th>
+                        <th>Receiver</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="txnTableBody">
+                    <tr><td colspan="7" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        checkAuth();
+
+        async function loadTransactions() {
+            const type = document.getElementById('filterType').value;
+            const status = document.getElementById('filterStatus').value;
+
+            let query = '/transactions?page=0&size=20';
+            if (type) query += `&type=${type}`;
+            if (status) query += `&status=${status}`;
+
+            try {
+                const res = await apiRequest(query);
+                const tbody = document.getElementById('txnTableBody');
+                tbody.innerHTML = '';
+
+                if (!res.data.content || res.data.content.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No transactions found matching criteria.</td></tr>';
+                    return;
+                }
+
+                res.data.content.forEach(t => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><code>${t.reference}</code></td>
+                        <td>${t.type}</td>
+                        <td>${t.senderEmail || '-'}</td>
+                        <td>${t.receiverEmail || '-'}</td>
+                        <td>₹${parseFloat(t.amount).toFixed(2)}</td>
+                        <td><span class="badge badge-active">${t.status}</span></td>
+                        <td>${new Date(t.createdAt).toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        document.getElementById('btnFilter').addEventListener('click', loadTransactions);
+        loadTransactions();
+    </script>
+</body>
+</html>
