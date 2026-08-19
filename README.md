@@ -233,19 +233,3 @@ Run full unit and integration test suite:
 * `MoneyTransferIntegrationTest`: Full Spring Context integration tests verifying ACID database rollbacks.
 
 ---
-
-## 11. Core Technical Interview Q&A
-
-### Q1: Why use `BigDecimal` instead of `double` or `float` for monetary amounts?
-`double` and `float` use IEEE 754 floating-point representation, which suffers from binary rounding errors (e.g., `0.1 + 0.2 = 0.30000000000000004`). In financial systems, accumulating floating-point inaccuracies leads to monetary loss and accounting mismatches. `BigDecimal` provides exact arbitrary-precision decimal arithmetic.
-
-### Q2: How does `@Transactional` guarantee transaction rollback on failure?
-Spring creates a dynamic AOP proxy around `@Transactional` service methods. It starts a database transaction before method execution. If the method executes successfully, the proxy commits the transaction. If an unhandled `RuntimeException` or `Error` is thrown, the proxy catches it and invokes `connection.rollback()`, ensuring no partial financial state changes persist.
-
-### Q3: How do you prevent double-spending in concurrent transfer requests?
-We employ two defensive layers:
-1. **JPA Optimistic Locking (`@Version`)**: Ensures that if two concurrent requests attempt to update the same wallet simultaneously, only one succeeds and the second fails with `ObjectOptimisticLockingFailureException`.
-2. **Idempotency Keys**: Unique database index on `idempotency_key` guarantees duplicate client retries return the original transaction result without re-executing money movement.
-
-### Q4: How do you prevent Insecure Direct Object References (IDOR)?
-We do not trust client-supplied user IDs in API path variables or request bodies for authorization. The backend extracts the user's identity directly from the authenticated `SecurityContext` populated by the `JwtAuthenticationFilter`. When requesting transaction details (`/api/transactions/{id}`), the service verifies that the authenticated user is either the sender or receiver (or has `ADMIN` role).
